@@ -1,0 +1,58 @@
+# Azure Storage 연동을 위한 환경 변수(.env) 설정 가이드
+
+가상 피팅(CatVTON) 자동화 파이프라인이 Azure 클라우드와 통신하기 위해서는 접근 권한을 증명하는 인증 정보가 필요합니다. 보안상 이 정보는 코드에 직접 작성하지 않고 `.env` 라는 환경 변수 파일에 저장하여 불러옵니다.
+
+이 문서는 `.env` 파일에 어떤 값을 넣어야 하고, 그 값을 Azure 포털 어디에서 찾을 수 있는지 안내합니다.
+
+---
+
+## 1. `.env` 파일 생성 및 기본 구조
+
+프로젝트 루트 폴더(가상피팅 관련 파이썬 스크립트를 실행할 최상위 경로)에 확장자 없이 `.env` 라는 이름으로 파일을 생성하고 아래 내용을 복사해 붙여넣습니다.
+
+```env
+# Azure Storage 계정 연결 문자열
+AZURE_STORAGE_CONNECTION_STRING="이곳에_연결문자열을_붙여넣으세요"
+
+# 입력 이미지를 가져올 컨테이너 이름 (선택적 커스텀 가능)
+INPUT_CONTAINER_NAME="input-images"
+
+# 최종 결과물을 업로드할 컨테이너 이름 (선택적 커스텀 가능)
+OUTPUT_CONTAINER_NAME="output-images"
+
+# ComfyUI 서버 주소 (기본값)
+COMFYUI_SERVER_ADDRESS="127.0.0.1:8188"
+```
+
+---
+
+## 2. `AZURE_STORAGE_CONNECTION_STRING` 발급 및 확인 방법
+
+가장 중요한 **연결 문자열(Connection String)**을 얻는 방법입니다.
+
+1. **Azure Portal 접속**: [https://portal.azure.com](https://portal.azure.com) 에 로그인합니다.
+2. **저장소 계정(Storage accounts) 이동**: 검색창에 "Storage accounts" 또는 "저장소 계정"을 검색하여 서비스로 이동합니다.
+3. **계정 선택**: 이미 생성해둔 저장소 계정(예: `virtualfittingstorage` 등)을 클릭합니다.
+4. **액세스 키(Access keys) 메뉴로 이동**:
+   * 왼쪽 사이드바 메뉴를 아래로 스크롤하여 **[보안 + 네트워킹 (Security + networking)]** 그룹을 찾습니다.
+   * 그 아래에 있는 **[액세스 키 (Access keys)]**를 클릭합니다.
+5. **연결 문자열 복사**:
+   * 'key1' 또는 'key2' 하단에 **연결 문자열 (Connection string)** 항목이 있습니다.
+   * `DefaultEndpointsProtocol=https;AccountName=...` 로 길게 시작하는 문자열입니다.
+   * 오른쪽에 있는 [복사] 버튼을 눌러 전체 문자열을 복사합니다.
+
+> ⚠️ 주의: 연결 문자열은 절대 외부에 노출되거나 GitHub 등에 커밋(Commit)되지 않도록 주의해야 합니다. `.env` 파일은 `.gitignore`에 등록하여 업로드되지 않게 관리하세요.
+
+---
+
+## 3. 컨테이너 생성 및 이름 확인
+
+위에서 설정한 `INPUT_CONTAINER_NAME`과 `OUTPUT_CONTAINER_NAME`이 실제로 Azure에 존재해야 스크립트가 작동합니다.
+
+1. 동일한 저장소 계정 화면 왼쪽 메뉴에서 **[데이터 스토리지 (Data storage)] -> [컨테이너 (Containers)]**를 클릭합니다.
+2. 상단에 **[+ 컨테이너]** 버튼을 눌러 입력용 컨테이너와 출력용 컨테이너를 각각 만듭니다. (예: `input-images`, `output-images`)
+3. 새로 만든 컨테이너의 이름을 정확히 `.env` 파일의 값과 일치하게 적어주시면 됩니다.
+
+---
+
+모든 값의 세팅이 끝났다면, 파이썬 스크립트 실행 시 `process_fitting_job.py` 가 자동으로 해당 자격 증명을 사용하여 이미지를 다운로드하고 업로드하게 됩니다.
