@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vfit-api
+  labels:
+    app: vfit-api
+spec:
+  replicas: 1 # KEDA 연동 전 기본 1개 실행. KEDA 사용 시 KEDA가 이 값을 제어합니다.
+  selector:
+    matchLabels:
+      app: vfit-api
+  template:
+    metadata:
+      labels:
+        app: vfit-api
+    spec:
+      # GPU 노드 풀에 스케줄링 되도록 노드 셀렉터 또는 톨러레이션 추가
+      nodeSelector:
+        agentpool: nodepool1
+      containers:
+        - name: vfit-container
+          # ACR 빌드 후의 이미지 주소로 변경해야 합니다 (예: catvton.azurecr.io/catvton-api:latest)
+          image: catvton.azurecr.io/catvton-api:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            - name: COMFYUI_SERVER_ADDRESS
+              value: "127.0.0.1:8188"
+            - name: API_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vfit-secrets
+                  key: API_SECRET_KEY
+            - name: INPUT_CONTAINER_NAME
+              value: "catvton"
+            - name: OUTPUT_CONTAINER_NAME
+              value: "catvton"
+            # Azure Storage 연동에 필요한 경우
+            - name: AZURE_STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: vfit-secrets
+                  key: AZURE_STORAGE_CONNECTION_STRING
+          resources:
+            limits:
+              nvidia.com/gpu: 1 # GPU 1장 할당
+              memory: "16Gi"
+            requests:
+              nvidia.com/gpu: 1
+              memory: "8Gi"
+              cpu: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vfit-service
+spec:
+  # 외부 로드밸런서를 생성하여 포털에서 접근 가능케 함 (ngrok 대체)
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: vfit-api

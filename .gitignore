@@ -1,0 +1,49 @@
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and Project
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and databases
+*.log
+log*.txt
+status.txt
+pod_logs*.txt
+*.sqlite
+
+# ML/DL weights, models, and data
+*.pth
+*.pt
+*.cpkt
+*.ckpt
+*.onnx
+*.h5
+*.hdf5
+dataset/
+datasets/
+data/
+outputs/
+temp_jobs/
+
+# ngrok, executable
+ngrok.exe
+*.zip
+*.jar
+
+# Temporary directories
+tmp/
+temp/
