@@ -1,0 +1,112 @@
+# 가상 피팅 API (Portal 연동) 사용 가이드
+
+이 문서는 사용자가 로컬에서 **FastAPI 백엔드 서버**를 구동하고, `Ngrok`을 통해 외부에 안전하게 API를 노출시켜 포털(프론트엔드)에서 가상 피팅 작업을 요청하는 방법을 설명합니다.
+
+---
+
+## 1. 초기 환경 설정 (.env)
+
+API 서버가 정상적으로 동작하려면 기존의 Azure Storage, ComfyUI 주소 외에 추가로 **API 인증키(API Key)**가 필요합니다.
+`.env` 파일에 아래 내용을 추가하거나 수정해 주세요.
+
+```env
+# ...기존 설정 유지...
+INPUT_CONTAINER_NAME="catvton"
+OUTPUT_CONTAINER_NAME="catvton"
+COMFYUI_SERVER_ADDRESS="127.0.0.1:8188"
+
+# 포털 접근 통제를 위한 비밀키 세팅 (원하는 영문/숫자로 자유롭게 변경 가능)
+API_SECRET_KEY="my_secure_portal_token_123"
+```
+
+---
+
+## 2. API 서버 켜고 끄기 (통제권)
+
+포털 개발자가 작업을 실행할 수 있도록 접근을 허락하려면 **두 개의 터미널**을 사용해야 합니다. 
+접근을 차단하고 싶다면 켜둔 터미널(서버나 Ngrok)을 그냥 종료(`Ctrl+C`)하시면 즉시 연결이 끊깁니다.
+
+### Step 1. FastAPI 서버 구동
+백그라운드에서 실행해둔 ComfyUI와 별도로, 새로 터미널을 열고 다음 명령어를 입력합니다.
+
+```bash
+uvicorn main:app --port 8000
+```
+> 터미널에 `Application startup complete.` 메시지가 뜨면 성공입니다.
+
+### Step 2. Ngrok 터널링 서버 구동 (외부 노출)
+FastAPI가 켜졌더라도 외부 포털에서는 접근할 수 없으므로, Ngrok을 이용해 임시 공인 주소를 만들어야 합니다.
+또 다른 새 터미널을 열고 다음 스크립트를 실행합니다.
+
+```bash
+ngrok http 8000
+```
+> 실행 시 화면 중간에 `Forwarding     https://abcd-123-45.ngrok-free.app -> http://localhost:8000` 형태의 URL 주소가 나타납니다. 
+> 이 **`https://...ngrok-free.app`** 주소가 바로 포털에서 입력할 "베이스 서버 주소" 입니다.
+
+---
+
+## 3. 포털에서 API 호출하는 방법
+
+포털 웹사이트나 외부 서비스에서 코드를 작성할 때, 위에서 얻은 Ngrok 주소의 `/api/v1/fit` 경로로 `POST` 방식의 HTTP 요청을 보내야 합니다.
+
+**이 때, 반드시 헤더(Header)에 설정한 비밀키를 전달해야 합니다.**
+
+### 🟢 API 스펙
+* **URL:** `POST` `https://<얻은_Ngrok_주소>.ngrok-free.app/api/v1/fit`
+* **Headers:** 
+  * `Content-Type`: `application/json`
+  * `x-api-key`: `my_secure_portal_token_123` (위 .env에 입력한 값)
+* **Body (JSON):**
+  ```json
+  {
+    "target_image_blob": "input/person/man2.jpg",
+    "garment_image_blob": "input/cloth/cloth1.png",
+    "cloth_type": "upper" 
+  }
+  ```
+  *(cloth_type은 "overall", "upper", "lower" 중 선택 가능, 기본값은 "overall")*
+
+### 🟡 클라이언트 호출 예시 (JavaScript / fetch)
+포털 프론트엔드 코드 예시입니다.
+
+```javascript
+const response = await fetch("https://abcd-123-45.ngrok-free.app/api/v1/fit", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+        "x-api-key": "my_secure_portal_token_123" // 보안키 필수!
+    },
+    body: JSON.stringify({
+        "target_image_blob": "input/person/man2.jpg",
+        "garment_image_blob": "input/cloth/cloth1.png",
+        "cloth_type": "upper"
+    })
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+### 🔵 결과(응답) 데이터 형태
+요청이 전달되면 파이썬 스크립트가 실행되고, 결과가 반환될 때까지(약 10초 내외) 기다린 후 아래 JSON이 반환됩니다.
+
+* **성공 시 (HTTP 200)**
+  ```json
+  {
+    "success": true,
+    "result_file": "output/result_20260303_14_man2_cloth1_upper.png"
+  }
+  ```
+* **실패 시 (인증 오류, HTTP 401)**
+  ```json
+  {
+    "detail": "Invalid API Key"
+  }
+  ```
+* **실패 시 (로직/ComfyUI 오류, HTTP 500)**
+  ```json
+  {
+    "detail": "Failed to download input/person/man2.jpg from Azure"
+  }
+  ```

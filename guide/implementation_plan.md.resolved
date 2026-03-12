@@ -1,0 +1,107 @@
+# 가상 피팅(Virtual Fitting) 프로젝트 단계별 구현 계획
+
+주어진 시스템 구조와 기술 스택을 바탕으로 한 단계별 프로젝트 구현 계획입니다. 인프라 구축부터 AI 모델 배포, 백엔드/프론트엔드 개발 및 전체 통합(MLOps/CI/CD)까지 체계적으로 진행할 수 있도록 구성했습니다.
+
+---
+
+## 🚀 단계 1: 프로젝트 기획 및 아키텍처 세분화 (Phase 1)
+본격적인 개발에 앞서 리소스를 정의하고 시스템 간의 데이터 흐름을 명확히 합니다.
+
+1. **API 스펙 및 데이터베이스 스키마 설계**
+   - 사용자 정보, 의류 데이터, 작업 상태(Job Status) 처리를 위한 Azure SQL 및 MongoDB 스키마 설계
+   - FastAPI 기반의 백엔드 API 명세서 작성 (Swagger/OpenAPI 연동)
+2. **Azure 인프라 아키텍처 세부 설계**
+   - VNet, Subnet 등 네트워크 보안 그룹(NSG) 설정
+   - Azure API Management(APIM) 라우팅 룰 및 인증 정책 설계
+3. **하이브리드 인퍼런스 시나리오 구체화**
+   - 가벼운 전처리(SAM)와 무거운 연산(CatVTON) 간의 데이터 전송 및 처리 흐름 정의
+4. **인프라 통합 비용 산정 및 기술 스택 비교 분석**
+   - Blob Storage(Cold/Hot Tier 구분) 사전 적재 의류 데이터 보관 비용 분석
+   - Azure ML / AKS GPU 노드(CatVTON) 구동 예측 비용과 타 클라우드 또는 기타 서버리스 GPU 솔루션(RunPod, Replicate 등)과의 TCO(총소유비용) 최적화 비교 계산
+
+---
+
+## ☁️ 단계 2: 클라우드 인프라 프로비저닝 (Phase 2)
+Azure 환경에서 필요한 모든 리소스를 생성하고 권한(IAM)을 설정합니다.
+
+1. **기본 리소스 구성**
+   - Azure Resource Group 생성 및 리전 설정
+   - Azure Blob Storage (이미지 입력/출력 저장소) 및 Azure SQL, MongoDB(Cosmos DB API 권장) 배포
+2. **메시징 및 API 게이트웨이 구성**
+   - Azure Service Bus(작업 큐) 생성 및 Topic/Queue 구성
+   - Azure API Management (APIM) 프로비저닝
+3. **컴퓨팅 및 AI 리소스 구성**
+   - Azure Container Registry(ACR) 생성
+   - Azure Kubernetes Service(AKS) GPU 노드 풀 구성
+   - Azure Machine Learning(AML) 워크스페이스 생성
+   - Azure Functions (서버리스 환경) 배포
+
+---
+
+## 🤖 단계 3: AI 모델 파이프라인 구축 및 MLOps (Phase 3)
+핵심 AI 모델을 배포하고 MLOps 파이프라인을 구축합니다.
+
+1. **모델 전처리 환경 구축 (서버리스)**
+   - SAM / Grounding DINO 모델을 경량화하여 Azure Functions 또는 경량 AKS 노드에 배포 (가벼운 전처리 용도)
+2. **CatVTON 모델 패키징 및 배포 (GPU 노드)**
+   - CatVTON 추론 환경을 Docker 컨테이너로 패키징
+   - AML Model Registry를 통해 모델 버전 등록
+   - AKS GPU 노드에 CatVTON 추론 API(FastAPI/Triton 등) 서버 배포 및 연동
+3. **오토스케일링(Auto-scaling) 설정**
+   - KEDA를 AKS에 설치하고, Azure Service Bus 큐의 메시지 수에 따라 GPU 파드가 자동으로 확장/축소(Scale in/out)되도록 설정
+4. **CI/CD 및 MLOps 자동화 (GitHub Actions)**
+   - 코드가 푸시되거나 새 모델이 AML에 등록되면 자동으로 ACR에 빌드/푸시되고 AKS 서버가 롤링 업데이트 되도록 파이프라인 구축
+
+---
+
+## ⚙️ 단계 4: 백엔드 서비스 개발 (Phase 4)
+프론트엔드와 AI 모델 간의 브릿지 역할을 하는 코어 비즈니스 로직을 개발합니다.
+
+1. **FastAPI 기반 코어 서버 구축 (비동기 처리 최적화)**
+   - API Management를 통해 들어오는 요청을 처리하는 엔드포인트 구현
+   - 전처리 요청(SAM)과 본작업(CatVTON) 분기 및 오케스트레이션 로직 구현
+2. **메시지 큐 및 스토리지 연동**
+   - Azure Blob Storage에 사용자의 이미지 및 마스크 업로드/다운로드 로직 구현
+   - Azure Service Bus와 연동하여 AI 작업 큐 발행 및 소비 로직 추가 (Producer/Consumer)
+3. **데이터베이스 및 외부 API 연동**
+   - Azure SQL (유저 메타데이터, 로그 저장) 및 MongoDB (작업 진행 상태 캐싱 - Pending, In-Progress, Completed) 연동
+   - Decart.ai API 연동 모듈 개발 (초저지연 실시간 비주얼 렌더링 호출용)
+
+---
+
+## 📱 단계 5: 프론트엔드 플랫폼 개발 (Phase 5)
+최종 사용자와 관리자가 사용할 클라이언트 환경을 구축합니다.
+
+1. **React Web / Admin (웹 어드민 및 서비스 플랫폼)**
+   - 작업 내역 관리, 의류 데이터셋 관리 대시보드 구현
+   - 가상 피팅 결과물을 뷰어 형태로 확인할 수 있는 갤러리 뷰 구현
+2. **Flutter Mobile App (사용자 모바일 앱)**
+   - 카메라 권한을 포함한 사진 촬영 및 디바이스 갤러리 업로드 UI
+   - 백엔드에 이미지 전송 및 폴링(Polling) 또는 Webhook을 통한 비동기 상태 조회 (MongoDB 캐시 활용)
+   - 합성된 이미지의 부드러운 전환 및 UI/UX 애니메이션 (Decart.ai API 렌더링 결과 실시간 스트리밍 반영 기능 포함)
+
+---
+
+## 🧪 단계 6: 테스트, 모니터링 및 최적화 (Phase 6)
+전체 시스템의 통합 테스트와 안정성 모니터링 체계를 확보합니다.
+
+1. **통합 및 부하 테스트**
+   - 멀티 유저 동시 접속 시 Azure Service Bus의 큐잉 및 KEDA의 GPU 노드 스케일링이 지연 없이 동작하는지 테스트 (Locust, JMeter 활용)
+   - Blob Storage 업로드부터 최종 결과 반환까지의 지연(Latency) 최소화 튜닝
+2. **모니터링 대시보드 구축**
+   - **Azure Monitor & Application Insights** 연동을 통해 백엔드 API 응답 속도, DB 쿼리 타임 로깅
+   - AKS 컨테이너 인사이트 활성화로 GPU 메트릭(메모리 사용량, 온도 등) 실시간 추적
+3. **하이브리드 인퍼런스 및 비용 최적화 검토**
+   - 전처리(서버리스)와 GPU 로드가 적절하게 분산되고 있는지 병목(Bottleneck) 구간 파악 및 최적화
+
+---
+
+## 🎯 전체 데이터 플로우 요약
+1. **[사용자]** Flutter/React에서 본인의 원본 사진(착용 사진) 업로드 및 시스템 사전 적재 의류(Blob Storage) 중 착용할 의류 선택
+2. **[APIM -> Backend]** FastAPI가 이미지를 접수하고, MongoDB에 상태를 `Pending`으로 저장.
+3. **[Backend -> Function/SAM]** 의류/체형 전처리(SAM) 경량 작업 수행.
+4. **[Backend -> Service Bus]** 전처리가 완료된 데이터를 바탕으로 Service Bus에 가상 피팅 큐 발행.
+5. **[AKS GPU / KEDA]** 큐에 메시지가 들어오면 AKS GPU Pod가 자동으로 스케일 아웃되며 **CatVTON** 추론을 시작.
+6. **[Decart.ai (옵션)]** 실시간 렌더링이 필요한 뷰의 경우 Decart.ai를 통해 초저지연 시각화.
+7. **[AKS -> Blob/DB]** 추론 완료 시 결과물을 Blob Storage에 저장하고 MongoDB의 상태를 `Completed`로 업데이트.
+8. **[사용자]** 앱에서 완료된 가상 피팅 결과를 다운로드하여 확인.

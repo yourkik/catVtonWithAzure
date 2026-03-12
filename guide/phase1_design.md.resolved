@@ -1,0 +1,85 @@
+# Phase 1: Architecture Design & Cost Estimation
+
+본 문서는 가상 피팅(Virtual Fitting) 프로젝트의 1단계 기획에 해당하는 **비용 산정 비교, DB/API 스키마, 그리고 인프라 아키텍처 및 데이터 플로우**를 정의합니다.
+
+---
+
+## 💰 1. 인프라 통합 비용 산정 및 기술 스택 비교 분석
+
+시스템의 핵심 비용은 영상을 처리하는 **GPU 연산**과 의류 이미지를 저장하는 **Blob 스토리지**에서 발생합니다.
+
+### 1.1 Azure Blob Storage (의류 데이터 보관 부문)
+시스템에 사전 적재될 의류 이미지는 읽기 빈도가 높을 수 있으므로 **Hot Tier**를 기준으로 계산합니다.
+- **저장 단가**: GB당 약 $0.018 / 월
+- **예상 비용**: 고해상도 의류 이미지 10,000장 (약 50GB 가정) 저장 시 **월 $0.90** 수준. 대용량 스토리지 비용은 매우 저렴하여 전체 TCO에 미치는 영향이 미미합니다.
+
+### 1.2 GPU 추론 환경 비교 (Azure AKS vs 서버리스 GPU API)
+CatVTON 처리를 위한 GPU 환경을 유지하는 비용입니다. (2024-2025 예상 시간당 요금 기준)
+
+| 서비스 제공자 | 인스턴스/GPU 모델 | 요금제 형태 | 시간당 환산 비용 (Estimate) | 장단점 및 특징 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Azure (AKS)** | **NC T4 v3** (T4 1장) | Dedicated VM | **~$0.52 / 시간** | - **가장 저렴한 시간당 구동 비용**<br>- KEDA 적용 시 트래픽에 맞춰 Pod 개수 조절 가능<br>- 단, 노드 자체를 끄지 않으면 대기 비용 발생 |
+| **Azure (AKS)** | **NC A100 v4** (A100) | Dedicated VM | **~$4.77 / 시간** | - 대규모 병렬/배치 처리에 유리하나 유지비용 높음 |
+| **RunPod** | **RTX 4090** | Serverless | **~$1.12 / 시간**<br>($0.00031/sec) | - 사용한 초(Second) 단위 과금 (Cold Start 발생)<br>- 트래픽이 간헐적일 때 비용 효율 극대화 |
+| **RunPod** | **A100 (80GB)** | Serverless | **~$2.74 / 시간**<br>($0.00076/sec) | - A100 중에서는 저렴한 편 |
+| **Replicate** | **Nvidia T4** | Serverless | **~$0.81 / 시간**<br>($0.000225/sec) | - 모델 배포가 매우 간편하나, 시간당 환산 시 Azure 전용 노드보다 비쌈 |
+
+> [!TIP]
+> **결론 및 최적화 전략 (Hybrid Strategy)**
+> - **Azure AKS + KEDA 조합**의 `Standard_NC4as_T4_v3` 인스턴스를 사용하는 것이 **가장 권장**됩니다.
+> - 트래픽이 있을 때만 Pod가 Scale-out 하도록 KEDA를 설정하여 처리량을 최적화할 수 있습니다.
+> - 만약 트래픽이 "극도로 간헐적"(하루에 몇 건)이라면 RunPod Serverless로 CatVTON 엔드포인트를 이동하는 것이 TCO 측면에서 유리할 수 있으나, 현재 기획된 **All-in-Azure MLOps 생태계(AML Model Registry 연동 등)** 통합성을 고려할 때 Azure AKS를 채택하는 것이 MLOps 파이프라인 구축에 훨씬 유리합니다.
+
+---
+
+## 🗄️ 2. 데이터베이스 스키마 및 API 스펙
+
+### 2.1 Database Schema (Azure SQL & MongoDB)
+
+**[Azure SQL] (정형 데이터 및 메타데이터)**
+- `Users` 테이블: 사용자 기본 정보 (`user_id`, `email`, `created_at`)
+- `Garments` 테이블 (시스템 사전 적재 의류):
+  - `garment_id` (PK)
+  - `name` (의류명, 예: "Summer T-Shirt")
+  - `category` (상의/하의/원피스)
+  - `blob_url` (Azure Blob Storage의 의류 이미지 경로)
+- `FittingHistory` 테이블:
+  - `history_id`, `user_id`, `garment_id`, `result_blob_url`, `created_at`
+
+**[MongoDB] (작업 큐 상태 및 실시간 캐싱)**
+- `Jobs` 컬렉션:
+  - `job_id`: UUID
+  - `user_id`: 요청 사용자
+  - `garment_id`: 선택한 의류 ID
+  - `user_image_url`: 업로드한 착용(원본) 사진 Blob URL
+  - `status`: "Pending" | "Processing" (SAM/ServiceBus) | "Completed" | "Failed"
+  - `result_url`: 생성된 가상 피팅 이미지 URL
+
+### 2.2 내부 Core API 명세 (FastAPI)
+
+- `GET /api/v1/garments`: 사전에 적재된 의류 목록(Garments table) 반환
+- `POST /api/v1/fitting/start`: 
+  - **Request Body**: `{ "user_image_blob_url": "...", "garment_id": 123 }`
+  - **Action**: MongoDB에 Job을 `Pending` 상태로 생성하고 Azure Service Bus 큐에 메시지 발행
+  - **Response**: `{ "job_id": "uuid-..." }`
+- `GET /api/v1/fitting/status/{job_id}`:
+  - **Action**: MongoDB에서 Job의 현재 상태 폴링(Polling)용 엔드포인트
+  - **Response**: `{ "job_id": "...", "status": "Completed", "result_url": "..." }`
+
+---
+
+## 🏗️ 3. 인프라 아키텍처 설계 & 데이터 플로우
+
+### 3.1 네트워크 및 리소스 배치 (Azure VNet)
+- **Public Subnet**: Azure API Management (인증 대행, API Limit 등 처리)
+- **Private Subnet 1 (Backend)**: AKS (FastAPI 서버, KEDA)
+- **Private Subnet 2 (GPU Node)**: AKS GPU Node Pool (CatVTON)
+- **Private Endpoint (PaaS)**: Azure SQL, MongoDB, Azure Storage, Service Bus에 대한 내외부 접근 제한
+
+### 3.2 하이브리드 데이터 프로세싱 플로우 (Hybrid Inference Definition)
+1. 클라이언트가 Blob Storage로 본인 사진을 직접 업로드(SAS 토큰 방식 활용) 후, FastAPI에 `POST /api/v1/fitting/start` 요청.
+2. FastAPI 서버가 1차적으로 **Azure Functions (또는 경량 AKS Pod)**를 호출하여 사용자의 사진에서 인물 영역을 추출하는 **SAM (Segment Anything)** 전처리를 가볍게 비동기 수행.
+3. SAM 처리가 완료되면 정제된 이미지 메타데이터를 **Azure Service Bus 큐**로 전송.
+4. **KEDA**가 Service Bus의 큐 길이를 인지하여, 큐 버퍼링이 발생할 경우 즉시 **AKS GPU Node (CatVTON Pod)**의 개수를 Scale-out 함.
+5. GPU Pod가 연산 완료 후 결과 이미지를 **Blob Storage**에 저장하고, MongoDB의 상태를 `Completed`로 업데이트.
+6. 클라이언트는 Polling 중이던 엔드포인트를 통해 즉시 완료 메시지를 수신하여 화면에 렌더링.

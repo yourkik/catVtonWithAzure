@@ -1,0 +1,72 @@
+# Azure GPU 환경 전환 가이드 ☁️🚀
+
+현재 시스템은 로컬 컴퓨터의 GPU 환경에서 `Ngrok`을 통해 API를 서비스하고 있습니다. 
+이를 **Azure 클라우드 GPU(AKS 등)** 환경으로 완전히 이관하기 위해서는 추가적인 작업들이 필요합니다. 기존에 기획된 `Phase 2` 인프라 설계 문서를 바탕으로, **사용자님이 직접 진행하셔야 할 작업 순서**를 정리해 드립니다.
+
+---
+
+## 🏗️ 1단계: Azure 인프라 생성 (Provisioning)
+가장 먼저 Azure 클라우드 상에 GPU 서버가 올라갈 공간과 뼈대를 만들어야 합니다.
+
+**해야 할 일:**
+1. **Azure CLI 설치 & 로그인**: 로컬 터미널에서 `az login` 명령어로 Azure 계정에 인증합니다.
+2. **Phase 2 스크립트 실행**: 이미 프로젝트 [Code/phase2_provisioning.md.resolved](file:///d:/%ED%95%99%EC%97%85%20%EA%B4%80%EB%A0%A8%20%ED%8C%8C%EC%9D%BC/%EC%9E%90%EB%A3%8C%20%EB%AA%A8%EC%9D%8C/dataSchool/1%EC%B0%A8%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8/catVtonWithAzure/Code/phase2_provisioning.md.resolved) 파일에 생성용 스크립트가 준비되어 있습니다. 
+3. 이 스크립트를 하나씩 복사/붙여넣기 하여 다음의 필수 리소스를 생성합니다:
+   * **Azure Container Registry (ACR)**: 도커 이미지를 저장할 приват 저장소 생성
+   * **Azure Kubernetes Service (AKS)**: 가상 피팅 시스템이 돌아갈 실제 서버 클러스터 생성. 이 때 **GPU 노드 풀(`Standard_NC4as_T4_v3` 등)**을 반드시 추가해야 합니다 (Azure GPU 코어 할당량 확인 필수).
+
+---
+
+## 🐳 2단계: 애플리케이션 도커 화 (Containerization)
+로컬에서 돌리던 파이썬 코드(FastAPI)와 ComfyUI, 그리고 무거운 AI 모델 (CatVTON) 파일들을 하나로 묶어(Docker Image) Azure에 올릴 수 있는 형태로 만들어야 합니다.
+
+**해야 할 일:**
+1. **Dockerfile 작성**: 
+   * 베이스 이미지로 `nvidia/cuda` (GPU 지원) 이미지를 선택합니다.
+   * `requirements.txt`에 있는 필수 Python 패키지 설치를 명시합니다.
+   * `ComfyUI`와 커스텀 노드, 가상 피팅 파이썬 스크립트들을 복사하는 과정을 추가합니다.
+2. **도커 이미지 빌드 및 푸시**: 
+   ```bash
+   # 도커 이미지 로컬에서 빌드
+   docker build -t myvfit-acr.azurecr.io/catvton-api:latest .
+   # Azure 컨테이너 레지스트리(ACR)에 업로드
+   docker push myvfit-acr.azurecr.io/catvton-api:latest
+   ```
+*(주의: AI 모델 용량이 크기 때문에 빌드 시 로컬 저장 공간과 업로드 시간이 상당히 소요될 수 있습니다.)*
+
+---
+
+## 🚀 3단계: AKS에 배포 및 KEDA 설정 (Deployment)
+Azure에 올라간 도커 이미지를 실제 GPU 서버에서 구동시키고, 비용 절감을 위해 자동 켜짐/꺼짐(Autoscaling)을 설정해야 합니다.
+
+**해야 할 일:**
+1. **Kubernetes YAML 파일 작성 (Deployment & Service)**: 
+   * 생성된 ACR 이미지를 가져와 Pod로 띄우는 배포 명세서를 작성합니다. 
+   * 이 때, GPU 리소스를 사용하겠다는 명시적인 설정(`nvidia.com/gpu: 1`)이 필요합니다.
+2. **KEDA(Kubernetes Event-driven Autoscaling) 연동**: 
+   * GPU 인스턴스는 켜두기만 해도 많은 비용이 발생합니다.
+   * Azure Service Bus(큐)에 작업(메시지)이 들어올 때만 GPU 노드를 0개에서 1개(또는 N개)로 띄우고, 작업이 끝나면 다시 0개로 Scale-down 하도록 `ScaledObject` YAML을 작성하고 적용해야 합니다.
+3. **kubectl 적용**:
+   ```bash
+   kubectl apply -f deployment.yaml
+   kubectl apply -f keda-scaler.yaml
+   ```
+
+---
+
+## 🔄 4단계: 기존 시스템 수정 (Migration)
+클라우드 배포가 완료되면, API 엔드포인트와 통신 구조가 바뀝니다.
+
+**해야 할 일:**
+1. **API 요청 주소 변경**: 프론트엔드/백엔드 개발자들에게 `Ngrok` 임시 주소가 아닌 **새로운 Azure AKS의 외부 IP 주소(또는 API Gateway 도메인)**를 전달해야 합니다.
+2. **비동기 큐 전환 (선택)**: 요청이 많을 경우 기존 REST API 동기 방식 대신, 외부 포털에서 직접 Azure Service Bus 메시지 큐에 작업을 밀어 넣도록 통신 구조를 개편하는 과정이 수반될 수 있습니다.
+
+---
+
+### 💡 요약 및 추천
+당장 급하게 Azure GPU로 올려야 한다면 다음 순서로 작업을 시작하시는 것을 권장합니다.
+
+1. **Azure GPU 코어 한도 확인 및 증설 요청** (Azure 포털에서 `NC4as_T4` 계열 사용 제한이 걸려있다면 풀어야 함)
+2. **Dockerfile 작성 준비** (현재 모든 코드 폴더 구조를 기반으로 Dockerfile 부터 생성 필요)
+
+이 가이드 중 **Dockerfile 작성 측면**이나 **Kubernetes 배포 YAML 작성 측면** 등 조금 더 상세한 기술 지원이 필요하다면 언제든 말씀해 주세요!

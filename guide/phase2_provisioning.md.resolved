@@ -1,0 +1,190 @@
+# Phase 2: 클라우드 인프라 프로비저닝 가이드 (Azure CLI)
+
+이 문서는 1단계에서 설계한 아키텍처(Azure AKS + KEDA, Blob Storage, MongoDB, Azure SQL, Service Bus 등)를 실제 Azure 환경에 배포하기 위한 **Azure CLI 명령어 스크립트**를 제공합니다. 명령어들은 Bash 또는 WSL 환경에서 실행하도록 작성되었습니다.
+
+---
+
+## 📌 0. 환경 변수 설정 및 로그인
+스크립트 실행 전 공통으로 사용할 리소스 이름과 위치를 변수로 지정합니다. `myvfit` 부분을 프로젝트에 맞게 고유한 이름으로 변경하세요.
+
+```bash
+# 기본 설정 변수
+export PREFIX="myvfit"
+export LOCATION="koreacentral" # 한국 중부 리전 (필요시 GPU 가용 리전인 eastus 등으로 변경)
+export RG_NAME="3dt-1st-team3"
+
+
+# 리소스 이름 변수
+export STORAGE_NAME="${PREFIX}storage$RANDOM"
+export SQL_SERVER_NAME="${PREFIX}-sql"
+export SQL_DB_NAME="vfitdb"
+export COSMOS_NAME="${PREFIX}-mongodb"
+export SB_NAMESPACE="${PREFIX}-sb"
+export ACR_NAME="catvton"
+export AKS_NAME="catvtonAKS"
+export AML_WORKSPACE="${PREFIX}-aml"
+
+# Azure 로그인
+az login
+```
+
+---
+
+## 🏗️ 1. 기본 리소스 (리소스 그룹, 스토리지, 데이터베이스)
+
+### 1-1. 리소스 그룹 생성
+```bash
+az group create --name $RG_NAME --location $LOCATION
+```
+
+### 1-2. Azure Blob Storage 계정 생성 (의류 및 결과물 저장용)
+```bash
+# 스토리지 계정 생성 (Hot Tier 기본)
+az storage account create \
+  --name $STORAGE_NAME \
+  --resource-group $RG_NAME \
+  --location $LOCATION \
+  --sku Standard_LRS \
+  --kind StorageV2 \
+  --access-tier Hot
+
+# 컨테이너 생성 (의류 원본 사진, 가상 피팅 결과 등)
+az storage container create --account-name $STORAGE_NAME --name original-images --auth-mode login
+az storage container create --account-name $STORAGE_NAME --name preloaded-garments --auth-mode login
+az storage container create --account-name $STORAGE_NAME --name result-images --auth-mode login
+```
+
+### 1-3. Azure SQL Database (사용자 및 메타데이터 저장용)
+```bash
+export SQL_ADMIN_USER="vfitadmin"
+export SQL_ADMIN_PASS="ChangeThisP@ssw0rd123!" # 강력한 비밀번호로 변경
+
+# SQL Server 생성
+az sql server create \
+  --name $SQL_SERVER_NAME \
+  --resource-group $RG_NAME \
+  --location $LOCATION \
+  --admin-user $SQL_ADMIN_USER \
+  --admin-password $SQL_ADMIN_PASS
+
+# SQL Database 생성 (Basic 티어 - 개발/테스트용)
+az sql db create \
+  --resource-group $RG_NAME \
+  --server $SQL_SERVER_NAME \
+  --name $SQL_DB_NAME \
+  --service-objective Basic
+```
+
+### 1-4. Azure Cosmos DB for MongoDB (실시간 작업 큐 상태 캐싱)
+```bash
+# Cosmos DB 계정 생성 (MongoDB API)
+az cosmosdb create \
+  --name $COSMOS_NAME \
+  --resource-group $RG_NAME \
+  --kind MongoDB \
+  --server-version 4.2 \
+  --locations regionName=$LOCATION failoverPriority=0 isZoneRedundant=False
+
+# MongoDB 데이터베이스 생성
+az cosmosdb mongodb database create \
+  --account-name $COSMOS_NAME \
+  --resource-group $RG_NAME \
+  --name "fitting_jobs"
+```
+
+---
+
+## 📬 2. 메시징 큐 구동 (Azure Service Bus)
+
+FastAPI 프론트 서버와 AKS GPU 노드 간의 비동기 메시지 처리를 담당합니다.
+
+```bash
+# Service Bus 네임스페이스 생성 (Standard 티어 이상에서 Queue 지원)
+az servicebus namespace create \
+  --name $SB_NAMESPACE \
+  --resource-group $RG_NAME \
+  --location $LOCATION \
+  --sku Standard
+
+# 가상 피팅 작업을 위한 Queue 생성
+az servicebus queue create \
+  --resource-group $RG_NAME \
+  --namespace-name $SB_NAMESPACE \
+  --name "fitting-task-queue"
+```
+
+---
+
+## 🚀 3. 컴퓨팅 및 AI (ACR, AKS, AML)
+
+### 3-1. Azure Container Registry (ACR)
+```bash
+# 도커 이미지 저장소 생성 (Basic 티어)
+az acr create \
+  --resource-group $RG_NAME \
+  --name $ACR_NAME \
+  --sku Basic \
+  --admin-enabled true
+```
+
+### 3-2. Azure Kubernetes Service (AKS) - GPU 노드 풀 포함
+권장받은 **Standard_NC4as_T4_v3** 인스턴스를 추가 노드 풀로 구성합니다.
+
+```bash
+# 1. 기본 시스템 노드 풀이 있는 AKS 클러스터 생성 (일반 API 서버 및 KEDA 용도)
+az aks create \
+  --resource-group $RG_NAME \
+  --name $AKS_NAME \
+  --node-count 1 \
+  --node-vm-size Standard_DS2_v2 \
+  --generate-ssh-keys \
+  --attach-acr $ACR_NAME \
+  --enable-managed-identity
+az aks create --resource-group $3dt-1st-team3 --name $catVtonAKS --node-count 1 --node-vm-size Standard_DS2_v2 --generate-ssh-keys --attach-acr $catvton --enable-managed-identity
+
+# 2. CatVTON 추론을 위한 GPU 노드 풀 추가 (NC_T4_v3 시리즈)
+# 중요: 해당 리전(가급적 eastus 등)에 GPU 할당량이 남아 있어야 합니다.
+az aks nodepool add \
+  --resource-group $RG_NAME \
+  --cluster-name $AKS_NAME \
+  --name gpunp \
+  --node-count 0 \
+  --min-count 0 \
+  --max-count 3 \
+  --enable-cluster-autoscaler \
+  --node-vm-size Standard_NC4as_T4_v3 \
+  --labels node-role.kubernetes.io/gpu=true \
+  --aks-custom-headers UseGPUDedicatedVHD=true
+
+# 3. KEDA Add-on 활성화 (Service Bus 기반 오토스케일링용)
+az aks update \
+  --resource-group $RG_NAME \
+  --name $AKS_NAME \
+  --enable-keda
+
+# 4. kubectl 자격 증명 가져오기
+az aks get-credentials --resource-group $RG_NAME --name $AKS_NAME
+```
+
+### 3-3. Azure Machine Learning (AML) Workspace
+Model Registry 워크플로우를 위해 생성합니다.
+```bash
+# AML 워크스페이스 확장을 위한 CLI 인스텐션 설치
+az extension add -n ml
+
+# Workspace 생성
+az ml workspace create \
+  --name $AML_WORKSPACE \
+  --resource-group $RG_NAME \
+  --location $LOCATION
+```
+
+---
+
+## ✅ 다음 단계 (Phase 3)
+위 인프라 스크립트를 실제 Azure 환경 포털의 Cloud Shell이나 로컬 터미널에서 실행하여 리소스를 모두 생성했다면, 다음 단계로 넘어갈 준비가 완료된 것입니다.
+
+다음 **Phase 3**에서는 다음을 진행합니다:
+1. **GitHub Actions를 활용한 CI/CD 로직 구성** (ACR 이미지 푸시 액션 배포 정리)
+2. **KEDA ScaleObject 작성**: Service Bus 큐 길이를 바탕으로 AKS GPU 파드(CatVTON)를 0에서 1 이상으로 스케일아웃 하는 Kubernetes YAML 작성.
+3. **MLOps Model Registry**: 모델 버저닝 및 패키징 설정.

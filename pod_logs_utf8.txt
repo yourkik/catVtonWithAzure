@@ -1,0 +1,177 @@
+﻿
+==========
+== CUDA ==
+==========
+
+CUDA Version 12.1.1
+
+Container image Copyright (c) 2016-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+This container image and its contents are governed by the NVIDIA Deep Learning Container License.
+By pulling and using the container, you accept the terms and conditions of this license:
+https://developer.nvidia.com/ngc/nvidia-deep-learning-container-license
+
+A copy of this license is made available in this container at /NGC-DL-CONTAINER-LICENSE for your convenience.
+
+Starting ComfyUI in the background...
+Waiting for ComfyUI to initialize...
+WARNING: You need pytorch with cu130 or higher to use optimized CUDA operations.
+Found comfy_kitchen backend triton: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8']}
+Found comfy_kitchen backend cuda: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8']}
+Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'scaled_mm_nvfp4']}
+Checkpoint files will always be loaded safely.
+Total VRAM 15930 MB, total RAM 28059 MB
+pytorch version: 2.5.1+cu121
+Set vram state to: LOW_VRAM
+Device: cuda:0 Tesla T4 : cudaMallocAsync
+Using async weight offloading with 2 streams
+Enabled pinned memory 26655.0
+Using pytorch attention
+Python version: 3.10.12 (main, Jan 26 2026, 14:55:28) [GCC 11.4.0]
+ComfyUI version: 0.15.1
+ComfyUI frontend version: 1.39.19
+[Prompt Server] web root: /usr/local/lib/python3.10/dist-packages/comfyui_frontend_package/static
+Traceback (most recent call last):
+  File "/app/ComfyUI/nodes.py", line 2223, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/__init__.py", line 7, in <module>
+    from .model.cloth_masker import AutoMasker as AM
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/model/cloth_masker.py", line 10, in <module>
+    from ..model.DensePose import DensePose  # type: ignore
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/model/DensePose/__init__.py", line 12, in <module>
+    from densepose import add_densepose_config
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/densepose/__init__.py", line 4, in <module>
+    from .data.datasets import builtin  # just to register data
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/densepose/data/__init__.py", line 5, in <module>
+    from .meshes import builtin
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/densepose/data/meshes/__init__.py", line 5, in <module>
+    from . import builtin
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/densepose/data/meshes/builtin.py", line 5, in <module>
+    from .catalog import MeshInfo, register_meshes
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/densepose/data/meshes/catalog.py", line 10, in <module>
+    from ..utils import maybe_prepend_base_path
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/densepose/data/utils.py", line 8, in <module>
+    from detectron2.config import CfgNode
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/detectron2/config/__init__.py", line 5, in <module>
+    from .lazy import LazyCall, LazyConfig
+  File "/app/ComfyUI/custom_nodes/ComfyUI-CatVTON/detectron2/config/lazy.py", line 15, in <module>
+    import cloudpickle
+ModuleNotFoundError: No module named 'cloudpickle'
+
+Cannot import /app/ComfyUI/custom_nodes/ComfyUI-CatVTON module for custom nodes: No module named 'cloudpickle'
+Traceback (most recent call last):
+  File "/app/ComfyUI/nodes.py", line 2223, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 879, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1016, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1073, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: '/app/ComfyUI/custom_nodes/__MACOSX/__init__.py'
+
+Cannot import /app/ComfyUI/custom_nodes/__MACOSX module for custom nodes: [Errno 2] No such file or directory: '/app/ComfyUI/custom_nodes/__MACOSX/__init__.py'
+
+Import times for custom nodes:
+   0.0 seconds: /app/ComfyUI/custom_nodes/websocket_image_save.py
+   0.0 seconds (IMPORT FAILED): /app/ComfyUI/custom_nodes/__MACOSX
+   0.1 seconds (IMPORT FAILED): /app/ComfyUI/custom_nodes/ComfyUI-CatVTON
+
+Context impl SQLiteImpl.
+Will assume non-transactional DDL.
+Assets scan(roots=['models']) completed in 0.045s (created=12, skipped_existing=0, orphans_pruned=12, total_seen=12)
+Starting server
+
+To see the GUI go to: http://127.0.0.1:8188
+Starting FastAPI server...
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+--- Starting fitting job ---
+Target: input/person/man2.jpg, Garment: input/cloth/cloth1.png, Cloth Type: upper, BG Removed: input/masking/G4BN7xcWAAAx4TZ_segmentation.png
+[catvton] Downloading input/person/man2.jpg to ./temp_jobs/man2.jpg...
+Download completed: ./temp_jobs/man2.jpg
+[catvton] Downloading input/cloth/cloth1.png to ./temp_jobs/cloth1.png...
+Download completed: ./temp_jobs/cloth1.png
+[catvton] Downloading input/masking/G4BN7xcWAAAx4TZ_segmentation.png to ./temp_jobs/bg_G4BN7xcWAAAx4TZ_segmentation.png...
+Error downloading input/masking/G4BN7xcWAAAx4TZ_segmentation.png from Azure: The specified blob does not exist.
+RequestId:b12d3268-701e-00a3-2016-adeea2000000
+Time:2026-03-06T03:07:05.3305237Z
+ErrorCode:BlobNotFound
+Content: <?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.
+RequestId:b12d3268-701e-00a3-2016-adeea2000000
+Time:2026-03-06T03:07:05.3305237Z</Message></Error>
+INFO:     10.224.0.4:50681 - "POST /api/v1/fit HTTP/1.1" 500 Internal Server Error
+INFO:     10.224.0.4:51974 - "GET / HTTP/1.1" 200 OK
+--- Starting fitting job ---
+Target: input/person/man2.jpg, Garment: input/cloth/cloth1.png, Cloth Type: upper, BG Removed: None
+[catvton] Downloading input/person/man2.jpg to ./temp_jobs/man2.jpg...
+Download completed: ./temp_jobs/man2.jpg
+[catvton] Downloading input/cloth/cloth1.png to ./temp_jobs/cloth1.png...
+Download completed: ./temp_jobs/cloth1.png
+Successfully uploaded man2.jpg to ComfyUI.
+Successfully uploaded cloth1.png to ComfyUI.
+Executing workflow...
+got prompt
+invalid prompt: {'type': 'missing_node_type', 'message': "Node 'LoadAutoMasker' not found. The custom node may not be installed.", 'details': "Node ID '#12'", 'extra_info': {'node_id': '12', 'class_type': 'LoadAutoMasker', 'node_title': 'LoadAutoMasker'}}
+Failed to connect to ComfyUI server: HTTP Error 400: Bad Request
+INFO:     10.224.0.4:18398 - "POST /api/v1/fit HTTP/1.1" 500 Internal Server Error
+--- Starting fitting job ---
+Target: input/person/man2.jpg, Garment: input/cloth/cloth1.png, Cloth Type: upper, BG Removed: None
+[catvton] Downloading input/person/man2.jpg to ./temp_jobs/man2.jpg...
+Download completed: ./temp_jobs/man2.jpg
+[catvton] Downloading input/cloth/cloth1.png to ./temp_jobs/cloth1.png...
+Download completed: ./temp_jobs/cloth1.png
+Successfully uploaded man2.jpg to ComfyUI.
+Successfully uploaded cloth1.png to ComfyUI.
+Executing workflow...
+got prompt
+invalid prompt: {'type': 'missing_node_type', 'message': "Node 'LoadAutoMasker' not found. The custom node may not be installed.", 'details': "Node ID '#12'", 'extra_info': {'node_id': '12', 'class_type': 'LoadAutoMasker', 'node_title': 'LoadAutoMasker'}}
+Failed to connect to ComfyUI server: HTTP Error 400: Bad Request
+INFO:     10.224.0.4:11270 - "POST /api/v1/fit HTTP/1.1" 500 Internal Server Error
+INFO:     10.224.0.4:63802 - "POST /cgi-bin/../../../../../../../../../../bin/sh HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "POST /cgi-bin/%252e%252e/%252e%252e/%252e%252e/%252e%252e/%252e%252e/%252e%252e/%252e%252e/bin/sh HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "POST /hello.world?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "POST /?%ADd+allow_url_include%3d1+%ADd+auto_prepend_file%3dphp://input HTTP/1.1" 405 Method Not Allowed
+INFO:     10.224.0.4:63802 - "GET /vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /vendor/phpunit/phpunit/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /vendor/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /vendor/phpunit/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /vendor/phpunit/phpunit/LICENSE/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /vendor/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /phpunit/phpunit/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /phpunit/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /lib/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /lib/phpunit/phpunit/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /lib/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /lib/phpunit/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /lib/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /laravel/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /www/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /ws/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /yii/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /zend/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /ws/ec/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /V2/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /tests/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /test/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /testing/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /demo/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /cms/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /crm/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /admin/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /backup/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /blog/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /workspace/drupal/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /panel/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /public/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /apps/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /app/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /index.php?s=/index/\think\app/invokefunction&function=call_user_func_array&vars[0]=md5&vars[1][]=Hello HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /public/index.php?s=/index/\think\app/invokefunction&function=call_user_func_array&vars[0]=md5&vars[1][]=Hello HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /index.php?lang=../../../../../../../../usr/local/lib/php/pearcmd&+config-create+/&/<?echo(md5("hi"));?>+/tmp/index1.php HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /index.php?lang=../../../../../../../../tmp/index1 HTTP/1.1" 404 Not Found
+INFO:     10.224.0.4:63802 - "GET /containers/json HTTP/1.1" 404 Not Found
